@@ -42,14 +42,28 @@ class PhotoGalleryFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                photoGalleryViewModel.galleryItems.collect { items ->
-                    binding.photoGrid.adapter = PhotoListAdapter(items)
+        val adapter = PhotoListAdapter()
+
+        binding.photoGrid.adapter = adapter
+
+        viewLifecycleOwnerLiveData.observe(viewLifecycleOwner) {
+            viewLifecycleOwner.lifecycleScope.launch {
+                try {
+                    Log.d(TAG, "Inside lifecycleScope.launch")
+                    viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                        Log.d(TAG, "Inside repeatOnLifecycle")
+                        photoGalleryViewModel.galleryItems.collect { pagingData ->
+                            adapter.submitData(pagingData)
+                            Log.d(TAG, "Inside collect: Data Received")
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.d(TAG, "This is the fragment onViewCreated Scope")
                 }
             }
         }
-    }
+        Log.d(TAG, "onViewCreated: Coroutine setup complete")
+}
 
     override fun onDestroyView() {
         super.onDestroyView()

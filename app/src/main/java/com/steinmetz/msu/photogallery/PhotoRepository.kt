@@ -1,14 +1,15 @@
 package com.steinmetz.msu.photogallery
 
+import android.util.Log
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import com.steinmetz.msu.photogallery.api.FlickrApi
 import com.steinmetz.msu.photogallery.api.GalleryItem
-import com.steinmetz.msu.photogallery.api.PhotoResponse
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import retrofit2.create
 
+private const val TAG = "PhotoRepository"
 class  PhotoRepository {
     private val flickrApi: FlickrApi
 
@@ -19,25 +20,43 @@ class  PhotoRepository {
             .build()
         flickrApi = retrofit.create()
     }
-
-    suspend fun fetchPhotos(): List<GalleryItem> =
-        flickrApi.fetchPhotos().photos.galleryItems
-
-    fun galleryItemPagingSource() = GalleryPagingSource()
+    fun galleryItemPagingSource() = GalleryPagingSource(flickrApi)
 }
-//
-//class GalleryPagingSource(val flickrApi: FlickrApi) :
-//        PagingSource<Int, PhotoResponse>() {
-//    override suspend fun load(params: LoadParams<Int>): LoadResult<Int, PhotoResponse> {
-//        val page = params.key ?: GALLERY_STARTING_PAGE_INDEX
-//
-//    }
-//
-//    override fun getRefreshKey(state: PagingState<Int, PhotoResponse>): Int? {
-//        TODO("Not yet implemented")
-//    }
-//}
+class GalleryPagingSource(private val apiService: FlickrApi) : PagingSource<Int, GalleryItem>() {
 
+    override suspend fun load(params: LoadParams<Int>): LoadResult<Int, GalleryItem> {
+
+        val pageNumber = params.key ?: STARTING_PAGE_INDEX
+        return try {
+
+            val response = apiService.fetchPhotos(pageNumber, params.loadSize)
+            val photos = response.photos.galleryItems
+
+            LoadResult.Page(
+                data = photos,
+                prevKey = if(pageNumber == STARTING_PAGE_INDEX) null else pageNumber - 1,
+                nextKey = if (photos.isEmpty()) null else pageNumber + 1
+            )
+        } catch (exception: Exception) {
+            Log.e(TAG, "Error fetching photos", exception)
+            LoadResult.Error(exception)
+        }
+
+    }
+
+    override fun getRefreshKey(state: PagingState<Int, GalleryItem>): Int? {
+        return  state.anchorPosition?.let {anchorPosition ->
+        val anchorPage = state.closestPageToPosition(anchorPosition)
+         anchorPage?.prevKey?.plus(1) ?: anchorPage?.nextKey?.minus(1)
+        }
+    }
+
+    init {
+        Log.d(TAG, "PhotoRepository utilized")
+    }
+}
+
+private const val STARTING_PAGE_INDEX = 0
 
 
 
